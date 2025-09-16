@@ -1,0 +1,349 @@
+{
+  "name": "Channel Stats 2",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -528,
+        16
+      ],
+      "id": "8761090f-4d08-484d-8882-3ab52fb47f2d",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/youtube/v3/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "part",
+              "value": "snippet"
+            },
+            {
+              "name": "channelId",
+              "value": "UChKJaUFTKfw5O8JtQmF4Q6g"
+            },
+            {
+              "name": "maxResults",
+              "value": "50"
+            },
+            {
+              "name": "order",
+              "value": "date"
+            },
+            {
+              "name": "type",
+              "value": "video"
+            },
+            {
+              "name": "key",
+              "value": "AIzaSyC8ORXw39mZpzVnznK33O6MSTPy-4ucl6g"
+            },
+            {
+              "name": "pageToken",
+              "value": "={{ $json[\"nextPageToken\"] || \"\" }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        64,
+        -208
+      ],
+      "id": "068bb6d1-ed74-4893-9ad4-9eb98456f596",
+      "name": "Get Video IDs Paginated"
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/youtube/v3/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "part",
+              "value": "snippet"
+            },
+            {
+              "name": "channelId",
+              "value": "UChKJaUFTKfw5O8JtQmF4Q6g"
+            },
+            {
+              "name": "maxResults",
+              "value": "50"
+            },
+            {
+              "name": "type",
+              "value": "video"
+            },
+            {
+              "name": "key",
+              "value": "AIzaSyC8ORXw39mZpzVnznK33O6MSTPy-4ucl6g"
+            },
+            {
+              "name": "order",
+              "value": "date"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -368,
+        16
+      ],
+      "id": "88b9a81d-9b8d-483d-9450-0b27430cf807",
+      "name": "Get Video IDs"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get all input items\nconst allInput = $input.all();\nconst response = allInput[0].json;\nconst videos = response.items || [];\n\n// Get loop count and accumulated IDs from input\nconst loopCount = allInput[0].json.loopCount || 0;\nconst seenTokens = new Set(allInput[0].json.seenTokens || []);\nlet allVideoIds = allInput[0].json.allVideoIds || [];\n\n// Limit to 10 iterations to prevent infinite loops (75 videos ~ 2 pages at maxResults=50)\nconst maxLoops = 10;\nif (loopCount >= maxLoops) {\n  console.log(`Max loop count (${maxLoops}) reached, outputting ${allVideoIds.length} IDs`);\n  return allVideoIds.map(id => ({ json: { videoId: id } }));\n}\n\n// Extract videoIds and filter out invalid ones\nconst ids = videos\n  .map(v => v.id.videoId)\n  .filter(id => id);\n\n// If no video IDs, output accumulated IDs\nif (ids.length === 0) {\n  console.log(`No video IDs found, outputting ${allVideoIds.length} IDs`);\n  return allVideoIds.map(id => ({ json: { videoId: id } }));\n}\n\n// Add new IDs to accumulated list\nallVideoIds = [...allVideoIds, ...ids];\n\n// Get nextPageToken\nconst nextPageToken = response.nextPageToken || null;\n\n// Check for duplicate nextPageToken\nif (nextPageToken && seenTokens.has(nextPageToken)) {\n  console.log(`Duplicate nextPageToken (${nextPageToken}), outputting ${allVideoIds.length} IDs`);\n  return allVideoIds.map(id => ({ json: { videoId: id } }));\n}\n\n// Add current nextPageToken to seenTokens\nif (nextPageToken) {\n  seenTokens.add(nextPageToken);\n}\n\n// If no nextPageToken, output all accumulated IDs\nif (!nextPageToken) {\n  console.log(`No nextPageToken, outputting ${allVideoIds.length} IDs`);\n  return allVideoIds.map(id => ({ json: { videoId: id } }));\n}\n\n// Continue pagination: return one item to loop back\nreturn [{\n  json: {\n    nextPageToken,\n    loopCount: loopCount + 1,\n    seenTokens: Array.from(seenTokens),\n    allVideoIds\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -208,
+        16
+      ],
+      "id": "fc66a81d-40fd-48ac-94a5-06473e7f5a70",
+      "name": "Extract IDs"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "67d9ce14-ecd1-46e9-bab6-0cf70a14c2eb",
+              "leftValue": "{{$json[\"nextPageToken\"]}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -64,
+        176
+      ],
+      "id": "afa532ae-d3e6-458d-9a35-1aca13504de4",
+      "name": "Check Next Page",
+      "alwaysOutputData": true,
+      "executeOnce": false
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        128,
+        16
+      ],
+      "id": "ff6dfbdd-1293-4aca-91d6-3045f3c56260",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/youtube/v3/videos",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "part",
+              "value": "snippet,statistics"
+            },
+            {
+              "name": "id",
+              "value": "={{ $json.videoId }}"
+            },
+            {
+              "name": "key",
+              "value": "AIzaSyC8ORXw39mZpzVnznK33O6MSTPy-4ucl6g"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        304,
+        16
+      ],
+      "id": "e14b965c-72e6-4351-a512-462552ce50c2",
+      "name": "Get Stats"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get all input items\nconst items = $input.all();\n\n// Convert to CSV\nlet csv = 'videoId,Title,View Count\\n';\nitems.forEach(item => {\n  const { videoId, title, viewCount } = item.json;\n  // Escape commas and quotes in title\n  const escapedTitle = title.replace(/\"/g, '\"\"').replace(/,/g, '\\\\,');\n  csv += `\"${videoId}\",\"${escapedTitle}\",${viewCount}\\n`;\n});\n\n// Return as JSON text for Convert to File\nreturn [{ json: { csvContent: csv } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        352,
+        240
+      ],
+      "id": "bf18a024-bb9c-4c53-b940-3a8b89f155ee",
+      "name": "Format CSV"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get all input items from the Get Stats node\nconst inputItems = $input.all();\n\n// Extract and flatten the videos from the items array in each response\nlet videos = inputItems.map(i => i.json.items || []).flat().filter(v => v.snippet && v.statistics);\n\n// Map to the desired output format\nreturn videos.map(v => ({\n  json: {\n    videoId: v.id,\n    title: v.snippet.title,\n    viewCount: v.statistics.viewCount\n  }\n}));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        16
+      ],
+      "id": "21612348-c9a2-4a80-9d16-106173a3a7e8",
+      "name": "Extract Statistics"
+    }
+  ],
+  "pinData": {
+    "When clicking ‘Execute workflow’": [
+      {
+        "json": {}
+      }
+    ]
+  },
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Get Video IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Video IDs": {
+      "main": [
+        [
+          {
+            "node": "Extract IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract IDs": {
+      "main": [
+        [
+          {
+            "node": "Check Next Page",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Next Page": {
+      "main": [
+        [
+          {
+            "node": "Get Video IDs Paginated",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Get Video IDs Paginated": {
+      "main": [
+        [
+          {
+            "node": "Extract IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Stats": {
+      "main": [
+        [
+          {
+            "node": "Extract Statistics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Get Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Statistics": {
+      "main": [
+        [
+          {
+            "node": "Format CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "dc661bf3-5c39-4983-a4a6-a3b43c6eb71d",
+  "meta": {
+    "instanceId": "fdf3d282aeca457c678cef1a0119510fb466fed2da4fb670e2e06e2d056799a1"
+  },
+  "id": "8sFWo8wgakjgZLAZ",
+  "tags": [
+    {
+      "createdAt": "2025-09-12T15:21:34.873Z",
+      "updatedAt": "2025-09-12T15:21:34.873Z",
+      "id": "GBVKqcUUgRewvnlI",
+      "name": "youtube"
+    }
+  ]
+}
